@@ -16,6 +16,6 @@ func New(appManagerConfig config.AppManager) (gsockets.AppManager, error) {
 	case "array":
 		return newConfigAppManager(appManagerConfig.Array), nil
 	default:
-		return nil, nil
+		return nil, ErrInvalidAppManagerDriver
 	}
 }

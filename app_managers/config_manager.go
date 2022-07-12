@@ -42,10 +42,7 @@ func (config *configAppManager) FindByKey(ctx context.Context, key string) (*gso
 
 // FindBySecret returns an app instance by app secret.
 func (config *configAppManager) GetAppSecret(ctx context.Context, id string) (string, error) {
-	app, err := config.FindById(ctx, id)
-	if err != nil {
-		return "", err
-	}
+	app, _ := config.FindById(ctx, id)
 
 	if app == nil {
 		return "", nil
