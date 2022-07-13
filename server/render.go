@@ -6,7 +6,7 @@ import (
 )
 
 type Response struct {
-	Message string      `json:"message"`
+	Message string      `json:"message,omitempty"`
 	Data    interface{} `json:"data,omitempty"`
 }
 
@@ -15,36 +15,22 @@ type ErrorResponse struct {
 	Code  int    `json:"code"`
 }
 
-func RenderSuccess(w http.ResponseWriter, message string, statusCode int) {
-	resp := Response{
-		Message: message,
+func RenderJSON(w http.ResponseWriter, statusCode int, message string, data interface{}) {
+	var body interface{}
+	if statusCode >= 400 {
+		body = ErrorResponse{
+			Error: message,
+			Code: statusCode,
+		}
+	} else if data != nil {
+		body = Response{Data: data}
+	} else {
+		body = Response{Message: message}
 	}
 
-	renderJSON(w, statusCode, resp)
-}
-
-func RenderSuccessWithData(w http.ResponseWriter, message string, statusCode int, data interface{}) {
-	resp := Response{
-		Message: message,
-		Data:    data,
-	}
-
-	renderJSON(w, statusCode, resp)
-}
-
-func RenderError(w http.ResponseWriter, message string, statusCode int) {
-	resp := ErrorResponse{
-		Error: message,
-		Code:  statusCode,
-	}
-
-	renderJSON(w, statusCode, resp)
-}
-
-func renderJSON(w http.ResponseWriter, statusCode int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 
 	w.WriteHeader(statusCode)
-	resp, _ := json.Marshal(v)
+	resp, _ := json.Marshal(body)
 	_, _ = w.Write(resp)
 }

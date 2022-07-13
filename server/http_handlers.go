@@ -5,5 +5,5 @@ import (
 )
 
 func (srv *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
-	RenderSuccess(w, "gsockets server", 200)
+	RenderJSON(w, 200, "gsockets server", nil)
 }
