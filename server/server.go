@@ -11,14 +11,18 @@ import (
 	appmanagers "github.com/gsockets/gsockets/app_managers"
 	"github.com/gsockets/gsockets/config"
 	"github.com/gsockets/gsockets/log"
+	"github.com/oklog/ulid/v2"
 )
 
 func New(config config.Config, logger log.Logger) *Server {
-	return &Server{closing: false, config: config, router: chi.NewRouter(), logger: logger.With("module", "server")}
+	return &Server{id: ulid.Make().String(), closing: false, config: config, router: chi.NewRouter(), logger: logger.With("module", "server")}
 }
 
 // Server struct is the gsockets server.
 type Server struct {
+	// id is the unique id for this server instance.
+	id string
+
 	// closing is set to true when the server process is shutting down.
 	// No new connection is accepted when the server is in closing state.
 	closing bool
@@ -30,13 +34,17 @@ type Server struct {
 	router     chi.Router
 }
 
+func (srv *Server) Id() string {
+	return srv.id
+}
+
 func (srv *Server) Start() error {
 	err := srv.initiate()
 	if err != nil {
 		return err
 	}
 
-	srv.logger.Info("msg", "http server started listening for requests", "port", srv.config.Server.Port)
+	srv.logger.Info("msg", "http server started listening for requests", "port", srv.config.Server.Port, "server_id", srv.id)
 
 	err = srv.httpServer.ListenAndServe()
 	if err != nil {
