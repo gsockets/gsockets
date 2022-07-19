@@ -16,7 +16,7 @@ func main() {
 	logger := log.New().With("module", "main")
 	config, err := config.Load("./../../")
 	if err != nil {
-		logger.Fatal(err)
+		logger.Fatal("msg", err)
 		return
 	}
 
