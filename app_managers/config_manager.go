@@ -23,7 +23,7 @@ func newConfigAppManager(appsConfig []gsockets.App) gsockets.AppManager {
 func (config *configAppManager) FindById(ctx context.Context, id string) (*gsockets.App, error) {
 	app, ok := config.apps[id]
 	if !ok {
-		return nil, nil
+		return nil, ErrInvalidAppId
 	}
 
 	return app, nil
@@ -37,7 +37,7 @@ func (config *configAppManager) FindByKey(ctx context.Context, key string) (*gso
 		}
 	}
 
-	return nil, nil
+	return nil, ErrInvalidAppKey
 }
 
 // FindBySecret returns an app instance by app secret.

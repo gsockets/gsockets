@@ -50,7 +50,7 @@ func TestFindByIdReturnsIfDoesNotExist(t *testing.T) {
 
 	app, err := manager.FindById(context.Background(), "invalid")
 
-	assert.Nil(t, err, "no error should be returned even if value does not exists")
+	assert.Equal(t, ErrInvalidAppId, err, "ErrInvalidAppId error should be returned if value does not exists")
 	assert.Nil(t, app, "returned app should be nil if not found")
 }
 
@@ -71,7 +71,7 @@ func TestFindByKeyReturnsIfDoesNotExists(t *testing.T) {
 
 	app, err := manager.FindByKey(context.Background(), "invalid-app-key")
 
-	assert.Nil(t, err, "no error should be returned even if value does not exists")
+	assert.Equal(t, ErrInvalidAppKey, err, "ErrInvalidAppKey error should be returned if value does not exists")
 	assert.Nil(t, app, "returned app should be nil if not found")
 }
 

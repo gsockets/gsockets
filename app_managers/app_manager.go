@@ -9,6 +9,8 @@ import (
 
 var (
 	ErrInvalidAppManagerDriver = errors.New("invalid driver for app manager")
+	ErrInvalidAppKey = errors.New("invalid appKey, no app exists with the given appKey")
+	ErrInvalidAppId = errors.New("invalid app id, no app exists with the given id")
 )
 
 func New(appManagerConfig config.AppManager) (gsockets.AppManager, error) {
