@@ -15,7 +15,14 @@ import (
 )
 
 func New(config config.Config, logger log.Logger) *Server {
-	return &Server{id: ulid.Make().String(), closing: false, config: config, router: chi.NewRouter(), logger: logger.With("module", "server")}
+	serverId := ulid.Make().String()
+	return &Server{
+		id:      serverId,
+		closing: false,
+		config:  config,
+		router:  chi.NewRouter(),
+		logger:  logger.With("module", "server", "server_id", serverId),
+	}
 }
 
 // Server struct is the gsockets server.

@@ -6,8 +6,7 @@ import (
 )
 
 type Response struct {
-	Message string      `json:"message,omitempty"`
-	Data    interface{} `json:"data,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 type ErrorResponse struct {
@@ -20,10 +19,10 @@ func RenderJSON(w http.ResponseWriter, statusCode int, message string, data inte
 	if statusCode >= 400 {
 		body = ErrorResponse{
 			Error: message,
-			Code: statusCode,
+			Code:  statusCode,
 		}
 	} else if data != nil {
-		body = Response{Data: data}
+		body = data
 	} else {
 		body = Response{Message: message}
 	}
