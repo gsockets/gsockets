@@ -7,12 +7,21 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/websocket"
 	"github.com/gsockets/gsockets"
 	appmanagers "github.com/gsockets/gsockets/app_managers"
 	"github.com/gsockets/gsockets/config"
 	"github.com/gsockets/gsockets/log"
 	"github.com/oklog/ulid/v2"
 )
+
+var upgrader = websocket.Upgrader{
+	ReadBufferSize: 1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
 
 func New(config config.Config, logger log.Logger) *Server {
 	serverId := ulid.Make().String()
