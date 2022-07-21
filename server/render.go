@@ -14,7 +14,7 @@ type ErrorResponse struct {
 	Code  int    `json:"code"`
 }
 
-func RenderJSON(w http.ResponseWriter, statusCode int, message string, data interface{}) {
+func RenderJSON(w http.ResponseWriter, statusCode int, message string, data any) {
 	var body interface{}
 	if statusCode >= 400 {
 		body = ErrorResponse{
