@@ -3,12 +3,14 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/gsockets/gsockets"
+	"github.com/gsockets/gsockets/channels"
 	"github.com/gsockets/gsockets/log"
 )
 
@@ -88,7 +90,7 @@ func (c *connection) Send(data any) {
 
 // Close closes the current connection
 func (c *connection) Close() {
-	c.channels.UnsubscribeFromAllChannels(c)
+	c.channels.RemoveConnection(c.app.ID, c)
 	c.closeCh <- struct{}{}
 	close(c.sendCh)
 
@@ -107,7 +109,6 @@ func (c *connection) readPump() {
 	_ = c.ws.SetReadDeadline(time.Now().Add(pongWait))
 
 	c.ws.SetPongHandler(func(appData string) error {
-		c.logger.Info("msg", "setPongHandler run")
 		_ = c.ws.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
@@ -124,8 +125,17 @@ func (c *connection) readPump() {
 			return
 		}
 
+		var pusherMessage gsockets.PusherMessage
 		message = bytes.TrimSpace(bytes.Replace(message, newLine, space, -1))
-		c.logger.Info("msg", "received message from the websocket connection", "payload", string(message))
+
+		err = json.Unmarshal(message, &pusherMessage)
+		if err != nil {
+			c.logger.Error("msg", "error decoding incoming message", "error", err.Error())
+			continue
+		}
+
+		c.logger.Info("msg", "received message from the websocket connection", "payload", pusherMessage)
+		c.handleMessage(pusherMessage)
 	}
 }
 
@@ -139,6 +149,8 @@ func (c *connection) writePump() {
 	for {
 		select {
 		case msg, ok := <-c.sendCh:
+			_ = c.ws.SetWriteDeadline(time.Now().Add(writeWait))
+
 			if !ok {
 				_ = c.ws.WriteMessage(websocket.CloseMessage, []byte{})
 				c.Close()
@@ -166,7 +178,6 @@ func (c *connection) writePump() {
 				return
 			}
 		case <-ticker.C:
-			
 			_ = c.ws.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.ws.WriteMessage(websocket.PingMessage, ping); err != nil {
 				c.logger.Error("msg", "error writing ping message to connection", "error", err.Error())
@@ -178,6 +189,47 @@ func (c *connection) writePump() {
 			return
 		}
 	}
+}
+
+func (c *connection) handleMessage(msg gsockets.PusherMessage) {
+	switch msg.Event {
+	case "pusher:ping":
+		c.handlePong()
+	case "pusher:subscribe":
+		c.handleSubscription(msg.Data)
+	default:
+		c.logger.Warn("msg", "handler not implemented", "event", msg.Event)
+	}
+}
+
+func (c *connection) handlePong() {
+	c.Send(gsockets.PusherSentMessage{Event: "pusher:pong", Data: "{}"})
+}
+
+func (c *connection) handleSubscription(payload gsockets.MessageData) {
+	ch := channels.New(payload.Channel, c.channels)
+	err := ch.Subscribe(c.app.ID, c, payload)
+
+	if err != nil {
+		var pusherErr gsockets.PusherError
+		if errors.As(err, &pusherErr) {
+			errPayload := gsockets.NewPusherError("pusher:subscription_error", pusherErr.Message, payload.Channel, pusherErr.Code)
+			c.Send(errPayload)
+			return
+		}
+
+		errPayload := gsockets.NewPusherError("pusher:subscription_error", err.Error(), payload.Channel, gsockets.ERROR_CONNECTION_IS_UNAUTHORIZED)
+		c.Send(errPayload)
+
+		return
+	}
+
+	resp := gsockets.PusherSentMessage{
+		Event:   "pusher_internal:subscription_succeeded",
+		Channel: payload.Channel,
+	}
+
+	c.Send(resp)
 }
 
 func generateConnectionId() string {
