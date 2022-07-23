@@ -2,6 +2,7 @@ package gsockets
 
 type MessageData struct {
 	Channel     string `json:"channel"`
+	Auth        string `json:"auth"`
 	ChannelData string `json:"channel_data"`
 	UserData    string `json:"user_data"`
 }
@@ -16,7 +17,6 @@ type PusherMessage struct {
 type PusherAPIMessage struct {
 	Name     string   `json:"name"`
 	Event    string   `json:"event"`
-	Channel  string   `json:"channel"`
 	Channels []string `json:"channels"`
 	Data     string   `json:"data"`
 	SocketId string   `json:"socket_id"`
@@ -24,6 +24,18 @@ type PusherAPIMessage struct {
 
 type PusherSentMessage struct {
 	Event   string `json:"event"`
-	Channel string `json:"channel"`
-	Data    string `json:"data"`
+	Channel string `json:"channel,omitempty"`
+	Data    any    `json:"data"`
+}
+
+func NewPusherError(errorEvent, message, channel string, code int) PusherSentMessage {
+	data := struct {
+		Message string `json:"message"`
+		Code    int    `json:"code"`
+	}{
+		Message: message,
+		Code:    code,
+	}
+
+	return PusherSentMessage{Event: errorEvent, Channel: channel, Data: data}
 }
