@@ -10,13 +10,14 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/gsockets/gsockets"
 	appmanagers "github.com/gsockets/gsockets/app_managers"
+	channelmanagers "github.com/gsockets/gsockets/channel_managers"
 	"github.com/gsockets/gsockets/config"
 	"github.com/gsockets/gsockets/log"
 	"github.com/oklog/ulid/v2"
 )
 
 var upgrader = websocket.Upgrader{
-	ReadBufferSize: 1024,
+	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
 		return true
@@ -43,9 +44,11 @@ type Server struct {
 	// No new connection is accepted when the server is in closing state.
 	closing bool
 
+	apps     gsockets.AppManager
+	channels gsockets.ChannelManager
+
 	logger     log.Logger
 	config     config.Config
-	apps       gsockets.AppManager
 	httpServer *http.Server
 	router     chi.Router
 }
@@ -96,7 +99,14 @@ func (srv *Server) initiate() error {
 		return err
 	}
 
+	cm, err := channelmanagers.New(srv.config.ChannelManager)
+	if err != nil {
+		return err
+	}
+
 	srv.apps = apps
+	srv.channels = cm
+
 	srv.routes()
 
 	httpServer := &http.Server{

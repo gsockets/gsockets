@@ -1,12 +1,18 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/gsockets/gsockets"
 	appmanagers "github.com/gsockets/gsockets/app_managers"
 )
+
+type okResponse struct {
+	Ok bool `json:"ok"`
+}
 
 func (srv *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
 	resp := struct {
@@ -18,6 +24,48 @@ func (srv *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	RenderJSON(w, 200, "", resp)
+}
+
+func (srv *Server) trigger(w http.ResponseWriter, r *http.Request) {
+	appId := chi.URLParam(r, "appId")
+	var body gsockets.PusherAPIMessage
+
+	err := json.NewDecoder(r.Body).Decode(&body)
+	if err != nil {
+		RenderJSON(w, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	app, err := srv.apps.FindById(r.Context(), appId)
+	if err != nil {
+		if errors.Is(err, appmanagers.ErrInvalidAppId) {
+			RenderJSON(w, http.StatusBadRequest, err.Error(), nil)
+			return
+		}
+
+		RenderJSON(w, http.StatusInternalServerError, "internal server error", nil)
+		return
+	}
+
+	broadcast := func(channel string) {
+		payload := gsockets.PusherSentMessage{
+			Event:   body.Name,
+			Channel: channel,
+			Data:    body.Data,
+		}
+
+		if body.SocketId == "" {
+			srv.channels.BroadcastToChannel(app.ID, channel, payload)
+		} else {
+			srv.channels.BroadcastExcept(app.ID, channel, payload, body.SocketId)
+		}
+	}
+
+	for _, channel := range body.Channels {
+		go broadcast(channel)
+	}
+
+	RenderJSON(w, http.StatusOK, "", okResponse{Ok: true})
 }
 
 func (srv *Server) serveWs(w http.ResponseWriter, r *http.Request) {
@@ -44,10 +92,14 @@ func (srv *Server) serveWs(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		srv.logger.Error("msg", "error upgrading to websocket connection", "error", err.Error())
-		RenderJSON(w, http.StatusInternalServerError, err.Error(), nil)
+		return
 	}
 
-	newConn := NewConnection(app, conn, nil, srv.logger)
+	newConn := NewConnection(app, conn, srv.channels, srv.logger)
+	srv.channels.AddConnection(app.ID, newConn)
+
+	srv.logger.Info("msg", "received new connection", "connection", newConn.Id())
+
 	resp := struct {
 		Event string `json:"event"`
 		Data  struct {
