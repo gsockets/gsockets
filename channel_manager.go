@@ -4,27 +4,35 @@ package gsockets
 // manager is responsible of keeping track of the active channels and all the connected connections
 // to the channels in the server.
 type ChannelManager interface {
-	// Find finds a channel by the given app and channel name.
-	Find(appId, channelName string) (Channel, error)
-
-	// FindOrCreate returns the channel with the given name and app if exists, otherwise
-	// it will create a new app and return it.
-	FindOrCreate(appId, channelName string) (Channel, error)
-
 	// GetLocalConnections returns the local connections stored in this instance regardless
 	// of the channel.
-	GetLocalConnections() ([]Connection, error)
+	GetLocalConnections(appId string) []Connection
 
 	// GetLocalChannels returns all the channels for a specific app for the current instance.
-	GetLocalChannels(appId string) ([]Channel, error)
+	GetLocalChannels(appId string) []string
+
+	// AddConnection adds a connection to this instance.
+	AddConnection(appId string, conn Connection)
+
+	// RemoveConnection removes a connection from this instance.
+	RemoveConnection(appId string, conn Connection)
 
 	// SubscribeToChannel subscribe a connection to a specific channel.
-	SubscribeToChannel(conn Connection, appId, channelName string, payload any) error
+	SubscribeToChannel(appId, channelName string, conn Connection, payload any)
 
 	// UnsubscribeFromChannel will remove a connection from specific channel.
-	UnsubscribeFromChannel(conn Connection, appId, channelName string, payload any) error
+	UnsubscribeFromChannel(appId, channelName string, conn Connection)
 
 	// UnsubscribeFromAllChannels will unsubscribe the connection accross all the channels it is
 	// subscribed to.
-	UnsubscribeFromAllChannels(conn Connection)
+	UnsubscribeFromAllChannels(appId, conn string)
+
+	// IsInChannel returns a boolean indicating if a connection is subscribed to a channel.
+	IsInChannel(appId string, channel string, conn Connection) bool
+
+	// BroadcastToChannel sends the given data to all the connected clients to the channel.
+	BroadcastToChannel(appId, channel string, data any)
+
+	// BroadcastExcept sends the given data to all the channels except the given connection id.
+	BroadcastExcept(appId, channel string, data any, connId string)
 }

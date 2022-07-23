@@ -1,0 +1,92 @@
+package channelmanagers
+
+import (
+	"sync"
+
+	"github.com/gsockets/gsockets"
+)
+
+type localChannelManager struct {
+	// namespaces is a map that stores channels and connections for each app in the
+	// server. Here the app id is the key, so all the connections and channels are
+	// separate for individual apps.
+	namespaces map[string]*gsockets.Namespace
+
+	namespaceLock sync.Mutex
+}
+
+func newLocalChannelManager() gsockets.ChannelManager {
+	return &localChannelManager{namespaces: make(map[string]*gsockets.Namespace)}
+}
+
+// getNamespace returns the namespace associated with the given appId, if no namespace exists
+// for the given app, a new namespace is created.
+func (l *localChannelManager) getNamespace(appId string) *gsockets.Namespace {
+	l.namespaceLock.Lock()
+	defer l.namespaceLock.Unlock()
+
+	namespace, ok := l.namespaces[appId]
+	if !ok {
+		namespace = gsockets.NewNamespace()
+		l.namespaces[appId] = namespace
+	}
+
+	return namespace
+}
+
+func (l *localChannelManager) AddConnection(appId string, conn gsockets.Connection) {
+	l.getNamespace(appId).AddConnection(conn)
+}
+
+func (l *localChannelManager) RemoveConnection(appId string, conn gsockets.Connection) {
+	l.getNamespace(appId).RemoveConnection(conn.Id())
+}
+
+func (l *localChannelManager) GetLocalConnections(appId string) []gsockets.Connection {
+	conns := make([]gsockets.Connection, 0)
+	for _, conn := range l.getNamespace(appId).GetConnections() {
+		conns = append(conns, conn)
+	}
+
+	return conns
+}
+
+func (l *localChannelManager) GetLocalChannels(appId string) []string {
+	return l.getNamespace(appId).GetChannels()
+}
+
+func (l *localChannelManager) SubscribeToChannel(appId string, channelName string, conn gsockets.Connection, payload any) {
+	l.getNamespace(appId).AddConnectionToChannel(channelName, conn)
+}
+
+func (l *localChannelManager) UnsubscribeFromChannel(appId string, channelName string, conn gsockets.Connection) {
+	l.getNamespace(appId).RemoveConnectionFromChannel(conn.Id(), channelName)
+}
+
+func (l *localChannelManager) UnsubscribeFromAllChannels(appId string, conn string) {
+	l.getNamespace(appId).RemoveConnectionFromChannel(conn, l.GetLocalChannels(appId)...)
+}
+
+func (l *localChannelManager) IsInChannel(appId string, channel string, conn gsockets.Connection) bool {
+	return l.getNamespace(appId).IsInChannel(conn.Id(), channel)
+}
+
+func (l *localChannelManager) BroadcastToChannel(appId string, channel string, data any) {
+	conns := l.getNamespace(appId).GetChannelConnections(channel)
+
+	for _, conn := range conns {
+		conn.Send(data)
+	}
+}
+
+func (l *localChannelManager) BroadcastExcept(appId string, channel string, data any, connId string) {
+	conns := l.getNamespace(appId).GetChannelConnections(channel)
+
+	for _, conn := range conns {
+		if conn.Id() == connId {
+			continue
+		}
+
+		conn.Send(data)
+	}
+}
