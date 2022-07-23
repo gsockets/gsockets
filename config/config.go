@@ -25,12 +25,17 @@ func Load(configPath string) (Config, error) {
 
 type Config struct {
 	Server
-	AppManager `mapstructure:"app_manager"`
+	AppManager     `mapstructure:"app_manager"`
+	ChannelManager `mapstructure:"channel_manager"`
 }
 
 type AppManager struct {
 	Driver string
 	Array  []gsockets.App
+}
+
+type ChannelManager struct {
+	Driver string
 }
 
 type Server struct {
