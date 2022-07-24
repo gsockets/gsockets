@@ -11,6 +11,13 @@ type ChannelManager interface {
 	// GetLocalChannels returns all the channels for a specific app for the current instance.
 	GetLocalChannels(appId string) []string
 
+	// GetGlobalChannels returns all the channels accross all instances.
+	GetGlobalChannels(appId string) []string
+
+	// GetGlobalChannelsWithConnectionCount returns the list of all the channels with number of connections
+	// subscribed to them.
+	GetGlobalChannelsWithConnectionCount(appId string) map[string]int
+
 	// AddConnection adds a connection to this instance.
 	AddConnection(appId string, conn Connection)
 

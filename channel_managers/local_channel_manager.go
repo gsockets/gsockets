@@ -55,6 +55,22 @@ func (l *localChannelManager) GetLocalChannels(appId string) []string {
 	return l.getNamespace(appId).GetChannels()
 }
 
+func (l *localChannelManager) GetGlobalChannels(appId string) []string {
+	return l.GetLocalChannels(appId)
+}
+
+func (l *localChannelManager) GetGlobalChannelsWithConnectionCount(appId string) map[string]int {
+	channels := l.GetGlobalChannels(appId)
+
+	ret := make(map[string]int)
+	for _, channel := range channels {
+		conns := l.getNamespace(appId).GetChannelConnections(channel)
+		ret[channel] = len(conns)
+	}
+
+	return ret
+}
+
 func (l *localChannelManager) SubscribeToChannel(appId string, channelName string, conn gsockets.Connection, payload any) {
 	l.getNamespace(appId).AddConnectionToChannel(channelName, conn)
 }
