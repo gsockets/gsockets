@@ -17,7 +17,7 @@ type PusherMessage struct {
 type PusherAPIMessage struct {
 	Name     string   `json:"name"`
 	Event    string   `json:"event"`
-	Channel  string   `json:'channel"`
+	Channel  string   `json:"channel"`
 	Channels []string `json:"channels"`
 	Data     string   `json:"data"`
 	SocketId string   `json:"socket_id"`
@@ -25,6 +25,16 @@ type PusherAPIMessage struct {
 
 type PusherBatchApiMessage struct {
 	Batch []PusherAPIMessage `json:"batch"`
+}
+
+type ChannelResponse struct {
+	SubscriptionCount int  `json:"subscription_count,omitempty"`
+	UserCount         int  `json:"user_count,omitempty"`
+	Occupied          bool `json:"occupied"`
+}
+
+type ChannelListResponse struct {
+	Channels map[string]ChannelResponse `json:"channels"`
 }
 
 type PusherSentMessage struct {

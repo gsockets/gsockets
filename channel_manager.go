@@ -18,6 +18,9 @@ type ChannelManager interface {
 	// subscribed to them.
 	GetGlobalChannelsWithConnectionCount(appId string) map[string]int
 
+	// GetChannelConnectionCount returns the number of connections currently subscribed with the given channel.
+	GetChannelConnectionCount(appId, channelName string) int
+
 	// AddConnection adds a connection to this instance.
 	AddConnection(appId string, conn Connection)
 

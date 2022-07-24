@@ -71,6 +71,11 @@ func (l *localChannelManager) GetGlobalChannelsWithConnectionCount(appId string)
 	return ret
 }
 
+func (l *localChannelManager) GetChannelConnectionCount(appId string, channelName string) int {
+	conns := l.getNamespace(appId).GetChannelConnections(channelName)
+	return len(conns)
+}
+
 func (l *localChannelManager) SubscribeToChannel(appId string, channelName string, conn gsockets.Connection, payload any) {
 	l.getNamespace(appId).AddConnectionToChannel(channelName, conn)
 }

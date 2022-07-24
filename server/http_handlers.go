@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gsockets/gsockets"
@@ -66,12 +67,37 @@ func (srv *Server) triggerBatch(w http.ResponseWriter, r *http.Request) {
 	RenderJSON(w, http.StatusOK, "", okResponse{Ok: true})
 }
 
+// allChannels returns all the active channels in the server along with how many connections are subscirbed
+// to each of those channels.
 func (srv *Server) allChannels(w http.ResponseWriter, r *http.Request) {
-	RenderJSON(w, http.StatusOK, "", srv.channels.GetGlobalChannelsWithConnectionCount(chi.URLParam(r, "appId")))
+	channels := srv.channels.GetGlobalChannelsWithConnectionCount(chi.URLParam(r, "appId"))
+	filter := r.URL.Query().Get("filter_by_prefix")
+
+	listResponse := make(map[string]gsockets.ChannelResponse)
+
+	for channel, count := range channels {
+		if filter != "" && !strings.HasPrefix(channel, filter) {
+			continue
+		}
+
+		listResponse[channel] = gsockets.ChannelResponse{SubscriptionCount: count, Occupied: count > 0}
+	}
+
+	RenderJSON(w, http.StatusOK, "", gsockets.ChannelListResponse{Channels: listResponse})
 }
 
+// channelDetails returns details about a single channel.
 func (srv *Server) channelDetails(w http.ResponseWriter, r *http.Request) {
-	RenderJSON(w, http.StatusOK, "", okResponse{Ok: true})
+	appId := chi.URLParam(r, "appId")
+	channelName := chi.URLParam(r, "channelName")
+
+	count := srv.channels.GetChannelConnectionCount(appId, channelName)
+	resp := gsockets.ChannelResponse{
+		SubscriptionCount: count,
+		Occupied:          count > 0,
+	}
+
+	RenderJSON(w, http.StatusOK, "", resp)
 }
 
 // broadcast distributes the messages to the channels backend. The message payload should be validated before
