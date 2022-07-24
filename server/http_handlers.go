@@ -26,6 +26,8 @@ func (srv *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
 	RenderJSON(w, 200, "", resp)
 }
 
+// trigger handles the api endpoint that accepts events from the application backends and distributes
+// them to the channels backend to be delivered to the subscirbed clients.
 func (srv *Server) trigger(w http.ResponseWriter, r *http.Request) {
 	appId := chi.URLParam(r, "appId")
 	var body gsockets.PusherAPIMessage
@@ -36,38 +38,62 @@ func (srv *Server) trigger(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app, err := srv.apps.FindById(r.Context(), appId)
-	if err != nil {
-		if errors.Is(err, appmanagers.ErrInvalidAppId) {
-			RenderJSON(w, http.StatusBadRequest, err.Error(), nil)
-			return
-		}
+	go srv.broadcast(appId, body)
 
-		RenderJSON(w, http.StatusInternalServerError, "internal server error", nil)
+	RenderJSON(w, http.StatusOK, "", okResponse{Ok: true})
+}
+
+// triggerBatch works similar to the trigger endpoint, the only difference is instead of a single
+// event, this endpoint accepts a batch of events.
+func (srv *Server) triggerBatch(w http.ResponseWriter, r *http.Request) {
+	appId := chi.URLParam(r, "appId")
+	var body gsockets.PusherBatchApiMessage
+
+	err := json.NewDecoder(r.Body).Decode(&body)
+	if err != nil {
+		RenderJSON(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 
-	broadcast := func(channel string) {
-		payload := gsockets.PusherSentMessage{
-			Event:   body.Name,
-			Channel: channel,
-			Data:    body.Data,
+	for _, msg := range body.Batch {
+		if msg.Channel != "" {
+			msg.Channels = append(msg.Channels, msg.Channel)
 		}
 
-		if body.SocketId == "" {
-			srv.channels.BroadcastToChannel(app.ID, channel, payload)
-		} else {
-			srv.channels.BroadcastExcept(app.ID, channel, payload, body.SocketId)
-		}
-	}
-
-	for _, channel := range body.Channels {
-		go broadcast(channel)
+		go srv.broadcast(appId, msg)
 	}
 
 	RenderJSON(w, http.StatusOK, "", okResponse{Ok: true})
 }
 
+func (srv *Server) allChannels(w http.ResponseWriter, r *http.Request) {
+	RenderJSON(w, http.StatusOK, "", srv.channels.GetGlobalChannelsWithConnectionCount(chi.URLParam(r, "appId")))
+}
+
+func (srv *Server) channelDetails(w http.ResponseWriter, r *http.Request) {
+	RenderJSON(w, http.StatusOK, "", okResponse{Ok: true})
+}
+
+// broadcast distributes the messages to the channels backend. The message payload should be validated before
+// calling broadcast, it doesn't do any validation or sanity checks, just pushes the message to channels.
+func (srv *Server) broadcast(appId string, msg gsockets.PusherAPIMessage) {
+	for _, channel := range msg.Channels {
+		payload := gsockets.PusherSentMessage{
+			Event:   msg.Name,
+			Channel: channel,
+			Data:    msg.Data,
+		}
+
+		if msg.SocketId == "" {
+			srv.channels.BroadcastToChannel(appId, channel, payload)
+		} else {
+			srv.channels.BroadcastExcept(appId, channel, payload, msg.SocketId)
+		}
+	}
+}
+
+// serveWs handles the incoming websocket connections. After doing some validations, serveWs upgrades the connection
+// to the websocket protocall and hands it off to the channels backend.
 func (srv *Server) serveWs(w http.ResponseWriter, r *http.Request) {
 	appKey := chi.URLParam(r, "appKey")
 	if appKey == "" {
