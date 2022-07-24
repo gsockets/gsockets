@@ -56,7 +56,7 @@ func NewConnection(app *gsockets.App, conn *websocket.Conn, cm gsockets.ChannelM
 		app:      app,
 		ws:       conn,
 		channels: cm,
-		logger:   logger.With("connection", connId),
+		logger:   logger.With("connection", connId, "module", "connection"),
 		closeCh:  make(chan struct{}),
 		sendCh:   make(chan []byte),
 	}
