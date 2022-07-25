@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -192,13 +193,20 @@ func (c *connection) writePump() {
 }
 
 func (c *connection) handleMessage(msg gsockets.PusherMessage) {
-	switch msg.Event {
-	case "pusher:ping":
+	if msg.Event == "pusher:ping" {
 		c.handlePong()
-	case "pusher:subscribe":
-		c.handleSubscription(msg.Data)
-	default:
-		c.logger.Warn("msg", "handler not implemented", "event", msg.Event)
+	} else if msg.Event == "pusher:subscribe" {
+		var data gsockets.MessageData
+		err := json.Unmarshal(msg.Data, &data)
+		if err != nil {
+			return
+		}
+
+		c.handleSubscription(data)
+	} else if msg.IsClientEvent() {
+		c.handleClientEvent(msg)
+	} else {
+		c.logger.Warn("msg", "handler not implemented for this type of events", "event", msg.Event)
 	}
 }
 
@@ -230,6 +238,32 @@ func (c *connection) handleSubscription(payload gsockets.MessageData) {
 	}
 
 	c.Send(resp)
+}
+
+func (c *connection) handleClientEvent(payload gsockets.PusherMessage) {
+	if !c.app.EnableClientMessages {
+		err := gsockets.NewPusherError("pusher:error", "The app does not have client messaging enabled", payload.Channel, gsockets.ERROR_CLIENT_EVENT_RATE_LIMIT)
+		c.Send(err)
+		return
+	}
+
+	// Client side events are only allowed in private and presence channel, if we don't get that, we ignore this request.
+	if !strings.HasPrefix(payload.Channel, "private-") && !strings.HasPrefix(payload.Channel, "presence-") {
+		return
+	}
+
+	// we silently ignore channel events if the connection is not subscribed to the given channel.
+	if !c.channels.IsInChannel(c.app.ID, payload.Channel, c) {
+		return
+	}
+
+	msg := gsockets.PusherSentMessage{
+		Event:   payload.Event,
+		Channel: payload.Channel,
+		Data:    payload.Data,
+	}
+
+	c.channels.BroadcastExcept(c.app.ID, payload.Channel, msg, c.id)
 }
 
 func generateConnectionId() string {

@@ -1,17 +1,26 @@
 package gsockets
 
+import (
+	"encoding/json"
+	"strings"
+)
+
 type MessageData struct {
-	Channel     string `json:"channel"`
-	Auth        string `json:"auth"`
-	ChannelData string `json:"channel_data"`
-	UserData    string `json:"user_data"`
+	Channel     string `json:"channel,omitempty"`
+	Auth        string `json:"auth,omitempty"`
+	ChannelData string `json:"channel_data,omitempty"`
+	UserData    string `json:"user_data,omitempty"`
 }
 
 type PusherMessage struct {
-	Name    string      `jsone:"name"`
-	Event   string      `json:"event"`
-	Channel string      `json:"channel"`
-	Data    MessageData `json:"data"`
+	Name    string          `jsone:"name"`
+	Event   string          `json:"event"`
+	Channel string          `json:"channel"`
+	Data    json.RawMessage `json:"data"`
+}
+
+func (p PusherMessage) IsClientEvent() bool {
+	return strings.HasPrefix(p.Event, "client-")
 }
 
 type PusherAPIMessage struct {
