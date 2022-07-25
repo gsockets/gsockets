@@ -16,14 +16,14 @@ type App struct {
 
 	// MaxConnections configures the maximum number of concurrent connections allowed
 	// for this app.
-	MaxConnections int
+	MaxConnections int `mapstructure:"max_connections"`
 
 	// EnableClientMessages configures whether client side messaging is enabled for
 	// this app.
-	EnableClientMessages bool
+	EnableClientMessages bool `mapstructure:"enable_client_messages"`
 
 	// MaxEventPayload configures the size of the maximum allowed payload size for events in
 	// kilobytes. It applies to both http api and websockets. If the value is negative, there
 	// is no payload size restriction.
-	MaxEventPayload int
+	MaxEventPayload int `mapstructure:"max_event_payload"`
 }
