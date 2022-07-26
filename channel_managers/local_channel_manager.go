@@ -76,6 +76,10 @@ func (l *localChannelManager) GetChannelConnectionCount(appId string, channelNam
 	return len(conns)
 }
 
+func (l *localChannelManager) GetChannelMembers(appId, channelName string) map[string]gsockets.PresenceMember {
+	return l.getNamespace(appId).GetChannelMembers(channelName)
+}
+
 func (l *localChannelManager) SubscribeToChannel(appId string, channelName string, conn gsockets.Connection, payload any) {
 	l.getNamespace(appId).AddConnectionToChannel(channelName, conn)
 }

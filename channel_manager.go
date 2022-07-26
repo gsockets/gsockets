@@ -18,6 +18,9 @@ type ChannelManager interface {
 	// subscribed to them.
 	GetGlobalChannelsWithConnectionCount(appId string) map[string]int
 
+	// GetChannelMembers returns all the subscribed user info for a presence channel.
+	GetChannelMembers(appId, channelName string) map[string]PresenceMember
+
 	// GetChannelConnectionCount returns the number of connections currently subscribed with the given channel.
 	GetChannelConnectionCount(appId, channelName string) int
 

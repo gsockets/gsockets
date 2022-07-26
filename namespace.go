@@ -177,3 +177,20 @@ func (n *Namespace) GetChannelConnections(channelName string) []Connection {
 
 	return conns
 }
+
+// GetChannelMembers returns the memebers of a presence channel.
+func (n *Namespace) GetChannelMembers(channlName string) map[string]PresenceMember {
+	channelConnections := n.GetChannelConnections(channlName)
+	members := make(map[string]PresenceMember)
+
+	for _, conn := range channelConnections {
+		member, ok := conn.GetPresence(channlName)
+		if !ok {
+			continue
+		}
+
+		members[member.UserId] = member
+	}
+
+	return members
+}
