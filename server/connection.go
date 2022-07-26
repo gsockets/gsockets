@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -38,10 +39,14 @@ var (
 type connection struct {
 	id string
 
-	app *gsockets.App
-	ws  *websocket.Conn
+	app          *gsockets.App
+	ws           *websocket.Conn
+	presence     map[string]gsockets.PresenceMember
+	presenceLock sync.Mutex
 
-	channels gsockets.ChannelManager
+	channels           gsockets.ChannelManager
+	subscribedChannels map[string]bool
+	channelLock        sync.Mutex
 
 	logger log.Logger
 
@@ -53,13 +58,15 @@ type connection struct {
 func NewConnection(app *gsockets.App, conn *websocket.Conn, cm gsockets.ChannelManager, logger log.Logger) gsockets.Connection {
 	connId := generateConnectionId()
 	newConn := &connection{
-		id:       connId,
-		app:      app,
-		ws:       conn,
-		channels: cm,
-		logger:   logger.With("connection", connId, "module", "connection"),
-		closeCh:  make(chan struct{}),
-		sendCh:   make(chan []byte),
+		id:                 connId,
+		app:                app,
+		ws:                 conn,
+		presence:           make(map[string]gsockets.PresenceMember),
+		subscribedChannels: make(map[string]bool),
+		channels:           cm,
+		logger:             logger.With("connection", connId, "module", "connection"),
+		closeCh:            make(chan struct{}),
+		sendCh:             make(chan []byte),
 	}
 
 	go newConn.readPump()
@@ -68,17 +75,47 @@ func NewConnection(app *gsockets.App, conn *websocket.Conn, cm gsockets.ChannelM
 	return newConn
 }
 
-// Id returns the unique connection id
 func (c *connection) Id() string {
 	return c.id
 }
 
-// App returns the app to which this connection has been made
 func (c *connection) App() *gsockets.App {
 	return c.app
 }
 
-// Send will send data back to the connected client
+func (c *connection) Presence() map[string]gsockets.PresenceMember {
+	c.presenceLock.Lock()
+	defer c.presenceLock.Unlock()
+
+	return c.presence
+}
+
+func (c *connection) GetPresence(channelName string) (gsockets.PresenceMember, bool) {
+	c.presenceLock.Lock()
+	defer c.presenceLock.Unlock()
+
+	presence, ok := c.presence[channelName]
+	return presence, ok
+}
+
+func (c *connection) SetPresence(channelName string, member gsockets.PresenceMember) {
+	c.presenceLock.Lock()
+	defer c.presenceLock.Unlock()
+
+	if _, ok := c.presence[channelName]; ok {
+		return
+	}
+
+	c.presence[channelName] = member
+}
+
+func (c *connection) RemovePresence(channelName string) {
+	c.presenceLock.Lock()
+	defer c.presenceLock.Unlock()
+
+	delete(c.presence, channelName)
+}
+
 func (c *connection) Send(data any) {
 	msg, err := json.Marshal(data)
 	if err != nil {
@@ -89,9 +126,8 @@ func (c *connection) Send(data any) {
 	c.sendCh <- msg
 }
 
-// Close closes the current connection
 func (c *connection) Close() {
-	c.channels.RemoveConnection(c.app.ID, c)
+	c.unsubscribeFromAllChannels()
 	c.closeCh <- struct{}{}
 	close(c.sendCh)
 
@@ -99,6 +135,8 @@ func (c *connection) Close() {
 	if err != nil {
 		c.logger.Error("msg", "error closing websocket connection", "error", err.Error())
 	}
+
+	c.channels.RemoveConnection(c.app.ID, c)
 }
 
 func (c *connection) readPump() {
@@ -232,12 +270,44 @@ func (c *connection) handleSubscription(payload gsockets.MessageData) {
 		return
 	}
 
-	resp := gsockets.PusherSentMessage{
-		Event:   "pusher_internal:subscription_succeeded",
-		Channel: payload.Channel,
+	c.channelLock.Lock()
+	if _, ok := c.subscribedChannels[payload.Channel]; !ok {
+		c.subscribedChannels[payload.Channel] = true
 	}
 
-	c.Send(resp)
+	c.channelLock.Unlock()
+
+}
+
+func (c *connection) unsubscribeFromAllChannels() {
+	c.channelLock.Lock()
+	defer c.channelLock.Unlock()
+
+	for channel := range c.subscribedChannels {
+		c.handleUnsubscribeUnlocked(channel)
+	}
+}
+
+func (c *connection) handleUnsubscribe(channelName string) {
+	c.channelLock.Lock()
+	defer c.channelLock.Unlock()
+
+	c.handleUnsubscribeUnlocked(channelName)
+}
+
+// handleUnsubscribeUnlocked handles the logic for unsubscribing from a channel and
+// removes the channel from connection's current subscribed channel list. The method
+// calling this method is responsible for accquiring the lock on the channels map.
+func (c *connection) handleUnsubscribeUnlocked(channelName string) {
+	channel := channels.New(channelName, c.channels)
+
+	err := channel.Unsubscribe(c.app.ID, channelName, c)
+	if err != nil {
+		c.logger.Error("error unsbuscribing from channel")
+		return
+	}
+
+	delete(c.subscribedChannels, channelName)
 }
 
 func (c *connection) handleClientEvent(payload gsockets.PusherMessage) {
