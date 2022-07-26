@@ -27,7 +27,7 @@ func (c *privateChannel) Subscribe(appId string, conn gsockets.Connection, paylo
 		return err
 	}
 
-	c.channelManager.SubscribeToChannel(appId, payload.Channel, conn, payload)
+	c.publicChannel.Subscribe(appId, conn, payload)
 	return nil
 }
 
@@ -59,9 +59,11 @@ func (c *privateChannel) getDataToSign(conn gsockets.Connection, payload gsocket
 	signatureString.WriteString(":")
 	signatureString.WriteString(payload.Channel)
 
+	// For presence channels, the string format is like this: "<socket_id>:<channel_name>:<JSON encoded user data>"
+	// This section takes care of that usecase too.
 	if payload.ChannelData != "" {
 		signatureString.WriteString(":")
-		signatureString.WriteString(payload.ChannelData)
+		signatureString.WriteString(string(payload.ChannelData))
 	}
 
 	return signatureString.String()

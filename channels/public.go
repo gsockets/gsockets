@@ -13,6 +13,13 @@ func newPublicChannel(cm gsockets.ChannelManager) gsockets.Channel {
 // Subscribe adds a new connection to the channel.
 func (c *publicChannel) Subscribe(appId string, conn gsockets.Connection, payload gsockets.MessageData) error {
 	c.channelManager.SubscribeToChannel(appId, payload.Channel, conn, payload)
+	resp := gsockets.PusherSentMessage{
+		Event:   "pusher_internal:subscription_succeeded",
+		Channel: payload.Channel,
+		Data:    "{}",
+	}
+
+	conn.Send(resp)
 	return nil
 }
 
