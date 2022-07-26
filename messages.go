@@ -23,6 +23,11 @@ func (p PusherMessage) IsClientEvent() bool {
 	return strings.HasPrefix(p.Event, "client-")
 }
 
+type PresenceMember struct {
+	UserId   string         `json:"user_id"`
+	UserInfo map[string]any `json:"user_info"`
+}
+
 type PusherAPIMessage struct {
 	Name     string   `json:"name"`
 	Event    string   `json:"event"`
@@ -50,6 +55,16 @@ type PusherSentMessage struct {
 	Event   string `json:"event"`
 	Channel string `json:"channel,omitempty"`
 	Data    any    `json:"data"`
+}
+
+type PusherPresencePayload struct {
+	Presence PusherPresenceData `json:"presence"`
+}
+
+type PusherPresenceData struct {
+	Ids   []string                  `json:"ids"`
+	Hash  map[string]map[string]any `json:"hash"`
+	Count int                       `json:"count"`
 }
 
 func NewPusherError(errorEvent, message, channel string, code int) PusherSentMessage {
