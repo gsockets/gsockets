@@ -17,14 +17,20 @@ type Namespace struct {
 	// id as key and the connection itself as the value.
 	conns map[string]Connection
 
+	// users stores all the connection ids coming from same authenticated users, this helps us to
+	// terminate all the connections from a specific user.
+	users map[string]map[string]bool
+
 	channelLock sync.Mutex
 	connLock    sync.Mutex
+	userLock    sync.Mutex
 }
 
 func NewNamespace() *Namespace {
 	return &Namespace{
 		channels: make(map[string]map[string]bool),
 		conns:    make(map[string]Connection),
+		users:    make(map[string]map[string]bool),
 	}
 }
 
@@ -193,4 +199,69 @@ func (n *Namespace) GetChannelMembers(channlName string) map[string]PresenceMemb
 	}
 
 	return members
+}
+
+// AddUser adds a connection to a user.
+func (n *Namespace) AddUser(userId, connId string) {
+	n.userLock.Lock()
+	defer n.userLock.Unlock()
+
+	if userConns, ok := n.users[userId]; ok {
+		if _, exists := userConns[connId]; exists {
+			return
+		} else {
+			userConns[connId] = true
+			n.users[userId] = userConns
+		}
+	} else {
+		userConns := make(map[string]bool)
+		userConns[connId] = true
+		n.users[userId] = userConns
+	}
+}
+
+// RemoveUser removes a connection associated with an user.
+func (n *Namespace) RemoveUser(userId, connId string) {
+	n.userLock.Lock()
+	defer n.userLock.Unlock()
+
+	n.removeUserUnlocked(userId, connId)
+}
+
+// GetUserSockets returns all the connections
+func (n *Namespace) GetUserConnections(userId string) []Connection {
+	n.userLock.Lock()
+	defer n.userLock.Unlock()
+
+	conns := make([]Connection, 0)
+	userConns, ok := n.users[userId]
+	if !ok {
+		return conns
+	}
+
+	for connId := range userConns {
+		conn, err := n.GetConnection(connId)
+		if err != nil {
+			n.removeUserUnlocked(userId, connId)
+			continue
+		}
+
+		conns = append(conns, conn)
+	}
+
+	return conns
+}
+
+// removeUserUnlocked removes an connection from the users. The calling method should
+// accuire the lock on users.
+func (n *Namespace) removeUserUnlocked(userId, connId string) {
+	userConns, ok := n.users[userId]
+	if !ok {
+		return
+	}
+
+	delete(userConns, connId)
+	if len(userConns) == 0 {
+		delete(n.users, userId)
+	}
 }
