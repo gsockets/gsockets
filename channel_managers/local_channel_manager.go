@@ -80,6 +80,18 @@ func (l *localChannelManager) GetChannelMembers(appId, channelName string) map[s
 	return l.getNamespace(appId).GetChannelMembers(channelName)
 }
 
+func (l *localChannelManager) SetUser(appId, userId, connId string) {
+	l.getNamespace(appId).AddUser(userId, connId);
+}
+
+func (l *localChannelManager) RemoveUser(appId, userId, connId string) {
+	l.getNamespace(appId).RemoveUser(userId, connId)
+}
+
+func (l *localChannelManager) GetUserConnections(appId, userId string) []gsockets.Connection {
+	return l.getNamespace(appId).GetUserConnections(userId)
+}
+
 func (l *localChannelManager) SubscribeToChannel(appId string, channelName string, conn gsockets.Connection, payload any) {
 	l.getNamespace(appId).AddConnectionToChannel(channelName, conn)
 }

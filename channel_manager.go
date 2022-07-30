@@ -30,6 +30,15 @@ type ChannelManager interface {
 	// RemoveConnection removes a connection from this instance.
 	RemoveConnection(appId string, conn Connection)
 
+	// SetUser associates a connection with an user.
+	SetUser(appId, userId, connId string)
+
+	// RemoveUser removes the link between a connection and user.
+	RemoveUser(appId, userId, connId string)
+
+	// GetUserConnections returns all the connection associated with a particular user.
+	GetUserConnections(appId, userId string) []Connection
+
 	// SubscribeToChannel subscribe a connection to a specific channel.
 	SubscribeToChannel(appId, channelName string, conn Connection, payload any)
 

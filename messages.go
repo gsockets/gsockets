@@ -23,6 +23,11 @@ func (p PusherMessage) IsClientEvent() bool {
 	return strings.HasPrefix(p.Event, "client-")
 }
 
+type PusherSigninUserData struct {
+	Id       string `json:"id"`
+	UserInfo string `json:"user_info"`
+}
+
 type PresenceMember struct {
 	UserId   string         `json:"user_id"`
 	UserInfo map[string]any `json:"user_info"`
