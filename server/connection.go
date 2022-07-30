@@ -2,6 +2,9 @@ package server
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,6 +46,8 @@ type connection struct {
 	ws           *websocket.Conn
 	presence     map[string]gsockets.PresenceMember
 	presenceLock sync.Mutex
+
+	userInfo *gsockets.PusherSigninUserData
 
 	channels           gsockets.ChannelManager
 	subscribedChannels map[string]bool
@@ -109,6 +114,15 @@ func (c *connection) SetPresence(channelName string, member gsockets.PresenceMem
 	c.presence[channelName] = member
 }
 
+func (c *connection) SetUser(userId, userInfo string) {
+	user := gsockets.PusherSigninUserData{Id: userId, UserInfo: userInfo}
+	c.userInfo = &user
+}
+
+func (c *connection) GetUser() *gsockets.PusherSigninUserData {
+	return c.userInfo
+}
+
 func (c *connection) RemovePresence(channelName string) {
 	c.presenceLock.Lock()
 	defer c.presenceLock.Unlock()
@@ -128,6 +142,10 @@ func (c *connection) Send(data any) {
 
 func (c *connection) Close() {
 	c.unsubscribeFromAllChannels()
+	if c.GetUser() != nil {
+		c.channels.RemoveUser(c.app.ID, c.GetUser().Id, c.id)
+	}
+	
 	c.closeCh <- struct{}{}
 	close(c.sendCh)
 
@@ -241,6 +259,14 @@ func (c *connection) handleMessage(msg gsockets.PusherMessage) {
 		}
 
 		c.handleSubscription(data)
+	} else if msg.Event == "pusher:signin" {
+		var data gsockets.MessageData
+		err := json.Unmarshal(msg.Data, &data)
+		if err != nil {
+			return
+		}
+
+		c.handleSignin(data)
 	} else if msg.IsClientEvent() {
 		c.handleClientEvent(msg)
 	} else {
@@ -277,6 +303,74 @@ func (c *connection) handleSubscription(payload gsockets.MessageData) {
 
 	c.channelLock.Unlock()
 
+}
+
+func (c *connection) handleSignin(payload gsockets.MessageData) {
+	err := c.verifySinginSignature(payload)
+	if err != nil {
+		var pusherErr gsockets.PusherError
+		if errors.As(err, &pusherErr) {
+			errPayload := gsockets.NewPusherError("pusher:error", pusherErr.Message, payload.Channel, pusherErr.Code)
+			c.Send(errPayload)
+			return
+		}
+
+		errPayload := gsockets.NewPusherError("pusher:error", err.Error(), payload.Channel, gsockets.ERROR_CONNECTION_IS_UNAUTHORIZED)
+		c.Send(errPayload)
+
+		return
+	}
+
+	var userInfo gsockets.PusherSigninUserData
+	err = json.Unmarshal([]byte(payload.UserData), &userInfo)
+	if err != nil {
+		errPayload := gsockets.NewPusherError("pusher:error", err.Error(), payload.Channel, gsockets.ERROR_CONNECTION_IS_UNAUTHORIZED)
+		c.Send(errPayload)
+		return
+	}
+
+	if userInfo.Id == "" {
+		errPayload := gsockets.NewPusherError("pusher:error", "id must be present in the user payload", payload.Channel, gsockets.ERROR_CONNECTION_IS_UNAUTHORIZED)
+		c.Send(errPayload)
+		return
+	}
+
+	userInfo.UserInfo = payload.UserData
+
+	c.SetUser(userInfo.Id, userInfo.UserInfo)
+	c.channels.SetUser(c.app.ID, userInfo.Id, c.id)
+
+	resp := gsockets.PusherSentMessage{
+		Event: "pusher:signin_success",
+		Data:  payload,
+	}
+
+	c.Send(resp)
+}
+
+func (c *connection) verifySinginSignature(payload gsockets.MessageData) error {
+	sigSclice := strings.SplitAfter(payload.Auth, ":")
+	sig, err := hex.DecodeString(strings.Join(sigSclice[1:], ""))
+
+	if err != nil {
+		return gsockets.PusherError{Code: gsockets.ERROR_CONNECTION_IS_UNAUTHORIZED, Message: "invalid signature string provided"}
+	}
+
+	// The signin signature string is formatting like this:
+	// "<socket-id>::user::<user-data>"
+	var signatureString strings.Builder
+	signatureString.WriteString(c.id)
+	signatureString.WriteString("::user::")
+	signatureString.WriteString(payload.UserData)
+
+	hasher := hmac.New(sha256.New, []byte(c.app.Secret))
+	hasher.Write([]byte(signatureString.String()))
+
+	if valid := hmac.Equal(sig, hasher.Sum(nil)); !valid {
+		return gsockets.PusherError{Code: gsockets.ERROR_CONNECTION_IS_UNAUTHORIZED, Message: "signature does not match"}
+	}
+
+	return nil
 }
 
 func (c *connection) unsubscribeFromAllChannels() {
