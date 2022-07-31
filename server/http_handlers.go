@@ -100,6 +100,25 @@ func (srv *Server) channelDetails(w http.ResponseWriter, r *http.Request) {
 	RenderJSON(w, http.StatusOK, "", resp)
 }
 
+// channelMembers returns all the users subscribed to a persence channel.
+func (srv *Server) channelMembers(w http.ResponseWriter, r *http.Request) {
+	channelName := chi.URLParam(r, "channelName")
+	if !strings.HasPrefix(channelName, "presence-") {
+		RenderJSON(w, http.StatusBadRequest, "The channel must be presence channel", nil)
+		return
+	}
+
+	channelMembers := srv.channels.GetChannelMembers(chi.URLParam(r, "appId"), channelName)
+	members := make([]gsockets.ChannelMember, 0)
+
+	for userId := range channelMembers {
+		members = append(members, gsockets.ChannelMember{Id: userId})
+	}
+
+	resp := gsockets.ChannelMemberResponse{Users: members}
+	RenderJSON(w, http.StatusOK, "", resp)
+}
+
 // broadcast distributes the messages to the channels backend. The message payload should be validated before
 // calling broadcast, it doesn't do any validation or sanity checks, just pushes the message to channels.
 func (srv *Server) broadcast(appId string, msg gsockets.PusherAPIMessage) {

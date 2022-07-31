@@ -18,5 +18,6 @@ func (srv *Server) routes() {
 		r.Post("/apps/{appId}/batch_events", srv.triggerBatch)
 		r.Get("/apps/{appId}/channels", srv.allChannels)
 		r.Get("/apps/{appId}/channels/{channelName}", srv.channelDetails)
+		r.Get("/apps/{appId}/channels/{channelName}/users", srv.channelMembers)
 	})
 }

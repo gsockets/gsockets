@@ -56,6 +56,14 @@ type ChannelListResponse struct {
 	Channels map[string]ChannelResponse `json:"channels"`
 }
 
+type ChannelMember struct {
+	Id string `json:"id"`
+}
+
+type ChannelMemberResponse struct {
+	Users []ChannelMember `json:"users"`
+}
+
 type PusherSentMessage struct {
 	Event   string `json:"event"`
 	Channel string `json:"channel,omitempty"`
