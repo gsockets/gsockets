@@ -19,6 +19,12 @@ type Connection interface {
 	// SetPresence sets a new presence channel subscription.
 	SetPresence(channelName string, member PresenceMember)
 
+	// SetUser associates this particular connection to an authenticated user.
+	SetUser(userId, userInfo string)
+
+	// GetUser returns the details for the authenticated user associated with this channel.
+	GetUser() *PusherSigninUserData
+
 	// RemovePresence removes subscription for a presence channel.
 	RemovePresence(channelName string)
 
