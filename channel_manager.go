@@ -30,6 +30,9 @@ type ChannelManager interface {
 	// RemoveConnection removes a connection from this instance.
 	RemoveConnection(appId string, conn Connection)
 
+	// TerminateUserConnections will terminate all the active connections from a particular user
+	TerminateUserConnections(appId, userId string)
+
 	// SetUser associates a connection with an user.
 	SetUser(appId, userId, connId string)
 

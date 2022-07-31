@@ -81,7 +81,7 @@ func (l *localChannelManager) GetChannelMembers(appId, channelName string) map[s
 }
 
 func (l *localChannelManager) SetUser(appId, userId, connId string) {
-	l.getNamespace(appId).AddUser(userId, connId);
+	l.getNamespace(appId).AddUser(userId, connId)
 }
 
 func (l *localChannelManager) RemoveUser(appId, userId, connId string) {
@@ -90,6 +90,18 @@ func (l *localChannelManager) RemoveUser(appId, userId, connId string) {
 
 func (l *localChannelManager) GetUserConnections(appId, userId string) []gsockets.Connection {
 	return l.getNamespace(appId).GetUserConnections(userId)
+}
+
+func (l *localChannelManager) TerminateUserConnections(appId, userId string) {
+	conns := l.getNamespace(appId).GetChannelConnections(userId)
+	for _, conn := range conns {
+		pusherErr := gsockets.NewPusherError("pusher:error", "disconnected by the server", "", gsockets.ERROR_CONNECTION_IS_UNAUTHORIZED)
+
+		go func(conn gsockets.Connection) {
+			conn.Send(pusherErr)
+			conn.Close()
+		}(conn)
+	}
 }
 
 func (l *localChannelManager) SubscribeToChannel(appId string, channelName string, conn gsockets.Connection, payload any) {

@@ -119,6 +119,14 @@ func (srv *Server) channelMembers(w http.ResponseWriter, r *http.Request) {
 	RenderJSON(w, http.StatusOK, "", resp)
 }
 
+// terminateUserConnections will disconnect all the connection from a particular user.
+func (srv *Server) terminateUserConnections(w http.ResponseWriter, r *http.Request) {
+	srv.channels.TerminateUserConnections(chi.URLParam(r, "appId"), chi.URLParam(r, "userId"))
+	res := okResponse{Ok: true}
+
+	RenderJSON(w, http.StatusOK, "", res)
+}
+
 // broadcast distributes the messages to the channels backend. The message payload should be validated before
 // calling broadcast, it doesn't do any validation or sanity checks, just pushes the message to channels.
 func (srv *Server) broadcast(appId string, msg gsockets.PusherAPIMessage) {

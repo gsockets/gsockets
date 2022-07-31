@@ -19,5 +19,6 @@ func (srv *Server) routes() {
 		r.Get("/apps/{appId}/channels", srv.allChannels)
 		r.Get("/apps/{appId}/channels/{channelName}", srv.channelDetails)
 		r.Get("/apps/{appId}/channels/{channelName}/users", srv.channelMembers)
+		r.Post("/apps/{appId}/users/{userId}/terminate_connections", srv.channelMembers)
 	})
 }
