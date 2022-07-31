@@ -145,7 +145,7 @@ func (c *connection) Close() {
 	if c.GetUser() != nil {
 		c.channels.RemoveUser(c.app.ID, c.GetUser().Id, c.id)
 	}
-	
+
 	c.closeCh <- struct{}{}
 	close(c.sendCh)
 
@@ -249,23 +249,19 @@ func (c *connection) writePump() {
 }
 
 func (c *connection) handleMessage(msg gsockets.PusherMessage) {
+	var data gsockets.MessageData
+	err := json.Unmarshal(msg.Data, &data)
+	if err != nil {
+		return
+	}
+
 	if msg.Event == "pusher:ping" {
 		c.handlePong()
 	} else if msg.Event == "pusher:subscribe" {
-		var data gsockets.MessageData
-		err := json.Unmarshal(msg.Data, &data)
-		if err != nil {
-			return
-		}
-
 		c.handleSubscription(data)
+	} else if msg.Event == "pusher:unsubscribe" {
+		c.handleUnsubscribe(data.Channel)
 	} else if msg.Event == "pusher:signin" {
-		var data gsockets.MessageData
-		err := json.Unmarshal(msg.Data, &data)
-		if err != nil {
-			return
-		}
-
 		c.handleSignin(data)
 	} else if msg.IsClientEvent() {
 		c.handleClientEvent(msg)
